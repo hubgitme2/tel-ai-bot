@@ -34,12 +34,9 @@
 
 روی دکمه‌ی زیر بزن:
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=<YOUR_REPO_URL>)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hhdoust2/tel-ai-bot)
 
-> اگر دکمه کار نکرد، این آدرس را در مرورگر باز کن (به‌جای
-> `<YOUR_REPO_URL>` آدرس همین ریپو را بگذار):
-> `https://deploy.workers.cloudflare.com/?url=<YOUR_REPO_URL>`
-
+> اگر دکمه کار نکرد، این آدرس را در مرورگر باز کن
 بعد از باز شدن صفحه:
 
 1. اگر در Cloudflare لاگین نباشی، ازت لاگین/ساخت اکانت رایگان می‌خواهد.
