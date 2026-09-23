@@ -16,12 +16,11 @@
 
 ## مراحل کامل راه‌اندازی
 ساخت حساب در cloudflare.com
+
 ساخت حساب github.com 
 
 
 1. یک ریپوی جدید و **عمومی (public)** در گیت‌هاب بساز.
-2. فایل‌های همین بسته (`tel-ai-bot.js`، `wrangler.jsonc`، `package.json`، `README.md`) رو داخلش push کن.
-3. توی همین `README.md`، آدرس `<YOUR_REPO_URL>` توی لینک دکمهٔ بالا رو با آدرس ریپوی خودت عوض کن و دوباره push کن.
 4. حالا روی دکمهٔ «Deploy to Cloudflare» بالا (یا داخل ریپوی گیت‌هابت) کلیک کن.
 5. وارد اکانت Cloudflare‌ت شو، مقدار `BOT_TOKEN` رو وارد کن، و روی Deploy بزن.
 6. بعد از اتمام دیپلوی، آدرس Worker رو (چیزی شبیه `https://tel-ai-bot.<account>.workers.dev`) به‌عنوان Webhook تلگرام ثبت کن:
