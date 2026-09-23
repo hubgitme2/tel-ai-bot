@@ -7,7 +7,6 @@ const MODELS = {
   llama33:  { label: "🦙 Llama 3.3 70B",            id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", type: "chat" },
   qwen:     { label: "🐉 Qwen3.8 27B",               id: "@cf/qwen/qwen3.8-27b", type: "chat" },
   glm:      { label: "✨ GLM-4.7 Flash",             id: "@cf/zai-org/glm-4.7-flash", type: "chat" },
-  seaLion:  { label: "🌊 Gemma SEA-LION v4 27B",     id: "@cf/aisingapore/gemma-sea-lion-v4-27b-it", type: "chat" },
   gemma4:   { label: "💎 Gemma 4 26B",               id: "@cf/google/gemma-4-26b-a4b-it", type: "chat" },
   gptoss:   { label: "🧠 GPT-OSS 120B",              id: "@cf/openai/gpt-oss-120b", type: "chat" },
   image:    { label: "🎨 ساخت تصویر (FLUX)",         id: "@cf/black-forest-labs/flux-1-schnell", type: "image" }
@@ -68,6 +67,79 @@ function formatForTelegram(rawText) {
 }
 __name(formatForTelegram, "formatForTelegram");
 
+// جدا کردن بلاک‌های کد (```...```) از بقیه‌ی متن؛ هر تکه جداگانه و امن ارسال می‌شود
+function splitCodeBlocks(text) {
+  const regex = /```(\w+)?\n?([\s\S]*?)```/g;
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", content: text.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: "code", lang: match[1] || "", content: match[2] });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: "text", content: text.slice(lastIndex) });
+  }
+  return segments;
+}
+__name(splitCodeBlocks, "splitCodeBlocks");
+
+// ارسال «هوشمند» پاسخ مدل به تلگرام: بلاک‌های کد از بقیه‌ی متن جدا می‌شوند، هر بخش به «تکه‌»های
+// امن HTML تبدیل می‌شود، و سپس این تکه‌ها تا سقف تلگرام (۴۰۹۶ کاراکتر) در کمترین تعداد پیام
+// ممکن با هم ادغام می‌شوند — یعنی فقط وقتی پیام واقعاً طولانی باشد چند تکه می‌شود، نه هر بار
+// که مدل چند بلاک کد کوچک (مثل ```Dockerfile```) وسط متن استفاده کرده.
+const REPLY_MAX_LEN = 3800; // زیر سقف واقعی تلگرام برای اطمینان
+const REPLY_CODE_CHUNK = 3500;
+
+// متن خام را به آرایه‌ای از تکه‌های HTML «کامل و مستقل» تبدیل می‌کند (هیچ تگی نصفه نمی‌ماند)
+function buildReplyPieces(rawText) {
+  const segments = splitCodeBlocks(String(rawText)).filter((s) => s.content.trim().length > 0);
+  const pieces = [];
+  for (const seg of segments) {
+    if (seg.type === "code") {
+      const raw = seg.content.trim();
+      for (let i = 0; i < raw.length; i += REPLY_CODE_CHUNK) {
+        const chunk = escapeHtml(raw.slice(i, i + REPLY_CODE_CHUNK));
+        pieces.push(`<pre><code>${chunk}</code></pre>`);
+      }
+    } else {
+      // نکته‌ی مهم: این‌جا trim نمی‌کنیم — فاصله/خطِ جدید دور هر بخش متنی نگه داشته می‌شود
+      // تا وقتی تکه‌ها به هم می‌چسبند (مثلاً متن کنار یک بلاک کد کوچک)، به هم قالب نشوند.
+      const raw = seg.content;
+      for (let i = 0; i < raw.length; i += REPLY_MAX_LEN) {
+        pieces.push(formatForTelegram(raw.slice(i, i + REPLY_MAX_LEN)));
+      }
+    }
+  }
+  return pieces;
+}
+__name(buildReplyPieces, "buildReplyPieces");
+
+async function replySmart(env, chatId, rawText) {
+  const pieces = buildReplyPieces(rawText);
+  if (!pieces.length) {
+    await sendTelegram(env.BOT_TOKEN, "sendMessage", { chat_id: chatId, text: "⚠️ پاسخ خالی دریافت شد." });
+    return;
+  }
+
+  let buffer = "";
+  for (const piece of pieces) {
+    // اگر اضافه‌کردن این تکه از سقف رد می‌شود، بافر فعلی را بفرست و یک پیام جدید شروع کن
+    if (buffer && buffer.length + piece.length > REPLY_MAX_LEN) {
+      await sendTelegram(env.BOT_TOKEN, "sendMessage", { chat_id: chatId, text: buffer, parse_mode: "HTML" });
+      buffer = "";
+    }
+    buffer += piece;
+  }
+  if (buffer) {
+    await sendTelegram(env.BOT_TOKEN, "sendMessage", { chat_id: chatId, text: buffer, parse_mode: "HTML" });
+  }
+}
+__name(replySmart, "replySmart");
+
 // تابع جستجوی زنده در وب با Tavily API
 async function searchWeb(query, apiKey) {
   try {
@@ -101,6 +173,41 @@ async function getUserModelKey(env, chatId) {
   return DEFAULT_MODEL_KEY;
 }
 __name(getUserModelKey, "getUserModelKey");
+
+// 🕒 گرفتن تاریخ امروز به وقت UTC (فرمت YYYY-MM-DD)
+function getUTCDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+__name(getUTCDate, "getUTCDate");
+
+// ⏳ محاسبه ثانیه‌های باقی‌مانده تا نیمه‌شب بعدی به وقت UTC (لحظه‌ی ریست روزانه)
+function secondsUntilUTCMidnight() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    hourCycle: 'h23',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric'
+  }).formatToParts(new Date());
+
+  const get = type => parseInt(parts.find(p => p.type === type).value, 10);
+
+  return 86400 - (get('hour') * 3600 + get('minute') * 60 + get('second'));
+}
+__name(secondsUntilUTCMidnight, "secondsUntilUTCMidnight");
+
+// 🕐 تبدیل ثانیه به متن خوانای فارسی (مثلاً «۳ ساعت و ۲۰ دقیقه» یا «۵ دقیقه»)
+function formatDuration(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.max(1, Math.ceil((totalSeconds % 3600) / 60));
+  return hours > 0 ? `${hours} ساعت و ${minutes} دقیقه` : `${minutes} دقیقه`;
+}
+__name(formatDuration, "formatDuration");
 
 // 📊 دریافت مجموع نورون مصرف‌شده امروز (به وقت UTC) از GraphQL Analytics کلادفلر
 // دیتاست: aiInferenceAdaptiveGroups — فیلد جمع‌شده: sum.totalNeurons
@@ -169,6 +276,7 @@ function formatNeuronUsage(usage) {
     `🔸 سقف رایگان روزانه: <b>${FREE_DAILY_LIMIT}</b>`,
     `🔸 باقیمانده (اگه پلن Free داری): <b>${remaining.toFixed(0)}</b>`,
     "🔸 ریست: هر روز ساعت ۰۰:۰۰ به وقت UTC",
+    `🔸 حدود ${formatDuration(secondsUntilUTCMidnight())} دیگه ریست می‌شه`,
     "",
     "ℹ️ اگه پلن Workers Paid داری، بعد از این سقف هم مصرفت ادامه پیدا می‌کنه ولی جداگانه هزینه‌اش حساب می‌شه."
   ].join("\n");
@@ -212,6 +320,35 @@ async function transcribeVoice(env, fileId) {
   return (result?.text || "").trim() || null;
 }
 __name(transcribeVoice, "transcribeVoice");
+
+// دانلود عمومی هر فایل تلگرام (عکس، سند، صوت و ...) و برگرداندن بایت‌های خام آن
+async function downloadTelegramFile(env, fileId) {
+  const fileInfoRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileId}`);
+  const fileInfo = await fileInfoRes.json();
+  if (!fileInfo.ok) {
+    throw new Error(fileInfo.description || "دریافت اطلاعات فایل از تلگرام ناموفق بود");
+  }
+  const fileRes = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${fileInfo.result.file_path}`);
+  if (!fileRes.ok) {
+    throw new Error(`دانلود فایل از تلگرام ناموفق بود (${fileRes.status})`);
+  }
+  return await fileRes.arrayBuffer();
+}
+__name(downloadTelegramFile, "downloadTelegramFile");
+
+// تحلیل تصویر با مدل Vision کلادفلر (طبق فرمت رسمی: image به‌صورت data URI base64)
+async function analyzeImage(env, imageBuffer, userPrompt) {
+  const base64 = arrayBufferToBase64(imageBuffer);
+  const response = await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", {
+    messages: [
+      { role: "system", content: "شما یک دستیار هوشمند فارسی‌زبان هستید که تصاویر را با دقت و به‌صورت مفید توصیف و تحلیل می‌کنید." },
+      { role: "user", content: userPrompt }
+    ],
+    image: `data:image/jpeg;base64,${base64}`
+  });
+  return (response?.response || response?.text || "").trim() || null;
+}
+__name(analyzeImage, "analyzeImage");
 
 // تشخیص اینکه متن حاوی حروف فارسی/عربی هست یا نه
 function isPersianText(text) {
@@ -339,9 +476,78 @@ export default {
       chatId = update.message.chat.id;
       let text = null;
 
-      // 🎙 پیام صوتی یا فایل صوتی: اول تبدیل به متن، بعد مثل یک پیام متنی عادی پردازش می‌شود
-      const voiceObj = update.message.voice || update.message.audio;
-      if (voiceObj) {
+      // 🖼 عکس: مستقیم با مدل Vision تحلیل می‌شود (مسیر جدا، وابسته به مدل چت انتخابی کاربر نیست)
+      if (update.message.photo && update.message.photo.length > 0) {
+        await sendTelegram(env.BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+        try {
+          const largestPhoto = update.message.photo[update.message.photo.length - 1];
+          const imageBuffer = await downloadTelegramFile(env, largestPhoto.file_id);
+          const userPrompt = (update.message.caption && update.message.caption.trim()) || "این تصویر را با جزئیات توصیف و تحلیل کن.";
+          const analysis = await analyzeImage(env, imageBuffer, userPrompt);
+          if (!analysis) {
+            throw new Error("مدل تصویری خروجی متنی برنگرداند.");
+          }
+          await replySmart(env, chatId, analysis);
+        } catch (imgAnalysisErr) {
+          await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: `🚨 تحلیل تصویر ناموفق بود:\n<pre><code>${escapeHtml(imgAnalysisErr.message)}</code></pre>`,
+            parse_mode: "HTML"
+          });
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // 📄 فایل متنی/کد (txt, html, js, css, json, py, md و ...): محتوا خونده می‌شه
+      // و مثل یک پیام متنی وارد پایپ‌لاین اصلی می‌شه. همهٔ این‌ها متن ساده‌ن (نه باینری)،
+      // پس همون منطق دانلود+دیکود UTF-8 برای همه‌شون کار می‌کنه.
+      const doc = update.message.document;
+      const TEXT_FILE_EXTENSIONS = /\.(txt|md|markdown|html?|css|js|jsx|mjs|ts|tsx|json|jsonc|xml|yaml|yml|csv|py|php|java|c|cpp|h|cs|rb|go|rs|sh|bash|sql|ini|env|log|conf|toml|svg)$/i;
+      const isTextFile =
+        doc &&
+        (
+          (doc.mime_type && doc.mime_type.startsWith("text/")) ||
+          [
+            "application/json",
+            "application/javascript",
+            "application/xml",
+            "application/x-sh",
+            "application/x-yaml",
+            "application/x-httpd-php",
+            "image/svg+xml"
+          ].includes(doc.mime_type || "") ||
+          TEXT_FILE_EXTENSIONS.test(doc.file_name || "")
+        );
+      if (doc && !isTextFile) {
+        await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: "📎 این فرمت فایل پشتیبانی نمی‌شه. فایل‌های متنی/کد (مثل txt, html, js, css, json, py, md) رو می‌تونی بفرستی؛ فایل‌های باینری مثل Word/Excel/PDF فعلاً پشتیبانی نمی‌شن."
+        });
+        return new Response("OK", { status: 200 });
+      }
+      if (isTextFile) {
+        await sendTelegram(env.BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+        try {
+          const fileBuffer = await downloadTelegramFile(env, doc.file_id);
+          let content = new TextDecoder("utf-8").decode(fileBuffer);
+          const MAX_CHARS = 8000;
+          let truncated = false;
+          if (content.length > MAX_CHARS) {
+            content = content.slice(0, MAX_CHARS);
+            truncated = true;
+          }
+          const instruction = (update.message.caption && update.message.caption.trim()) || "این فایل را بررسی، خلاصه و تحلیل کن.";
+          text = `نام فایل: ${doc.file_name || "نامشخص"}\n\n${content}${truncated ? "\n\n[...به دلیل طولانی بودن فایل، ادامهٔ متن کوتاه شد...]" : ""}\n\n---\nدرخواست کاربر دربارهٔ فایل بالا: ${instruction}`;
+        } catch (docErr) {
+          await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: `🚨 خواندن فایل ناموفق بود:\n<pre><code>${escapeHtml(docErr.message)}</code></pre>`,
+            parse_mode: "HTML"
+          });
+          return new Response("OK", { status: 200 });
+        }
+      } else if (update.message.voice || update.message.audio) {
+        const voiceObj = update.message.voice || update.message.audio;
         await sendTelegram(env.BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
         try {
           text = await transcribeVoice(env, voiceObj.file_id);
@@ -375,12 +581,45 @@ export default {
         return new Response("OK", { status: 200 });
       }
 
+      // 🆕 شروع مکالمهٔ جدید: تاریخچهٔ چت این کاربر از KV پاک می‌شه تا مدل دیگه موضوع قبلی رو ادامه نده
+      if (text === "/new" || text === "/clear" || text === "/reset") {
+        if (env.CHAT_HISTORY) {
+          await env.CHAT_HISTORY.delete(`chat_${chatId}`);
+        }
+        await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: "🆕 مکالمهٔ جدید شروع شد؛ حافظهٔ گفتگوی قبلی پاک شد."
+        });
+        return new Response("OK", { status: 200 });
+      }
+
+      // 🧭 تأیید یک‌بارهٔ لایسنس مدل Vision (لازم قبل از اولین استفاده از تحلیل عکس)
+      if (text === "/agreevision") {
+        try {
+          const licenseRes = await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", { prompt: "agree" });
+          await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: `✅ لایسنس مدل تحلیل تصویر (Llama 3.2 Vision) تأیید شد.\n\nپاسخ کلادفلر:\n<pre><code>${escapeHtml(JSON.stringify(licenseRes).slice(0, 500))}</code></pre>\n\nحالا می‌تونی عکس بفرستی تا تحلیلش کنم.`,
+            parse_mode: "HTML"
+          });
+        } catch (licenseErr) {
+          await sendTelegram(env.BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: `🚨 تأیید لایسنس ناموفق بود:\n<pre><code>${escapeHtml(licenseErr.message)}</code></pre>`,
+            parse_mode: "HTML"
+          });
+        }
+        return new Response("OK", { status: 200 });
+      }
+
       // 🧭 دستور نمایش/تغییر مدل
       if (text === "/model" || text === "/models") {
         const currentKey = await getUserModelKey(env, chatId);
+        const neuronUsage = await getNeuronUsage(env);
+        const neuronText = formatNeuronUsage(neuronUsage);
         await sendTelegram(env.BOT_TOKEN, "sendMessage", {
           chat_id: chatId,
-          text: `مدل فعلی شما: <b>${escapeHtml(MODELS[currentKey].label)}</b>\nشناسه: <code>${escapeHtml(MODELS[currentKey].id)}</code>\n\nیکی از مدل‌های زیر رو انتخاب کن:`,
+      text: `سلام! من دستیار هوشمند شما هستم 🤖\n\n${neuronText}\n\nمدل فعلی: <b>${escapeHtml(MODELS[currentKey].label)}</b>\nشناسه: <code>${escapeHtml(MODELS[currentKey].id)}</code>\n\nیکی از مدل‌های زیر رو انتخاب کن:`,
           parse_mode: "HTML",
           reply_markup: buildModelKeyboard(currentKey)
         });
@@ -394,7 +633,7 @@ export default {
         const neuronText = formatNeuronUsage(neuronUsage);
         await sendTelegram(env.BOT_TOKEN, "sendMessage", {
           chat_id: chatId,
-          text: `سلام! من دستیار هوشمند شما هستم 🤖\n\n${neuronText}\n\nمدل فعلی: <b>${escapeHtml(MODELS[currentKey].label)}</b>\n\nهر سوالی داری بپرس. برای تغییر مدل هوش مصنوعی، دستور /model رو بفرست.`,
+          text: `سلام! من دستیار هوشمند شما هستم 🤖\n\n${neuronText}\n\nمدل فعلی: <b>${escapeHtml(MODELS[currentKey].label)}</b>\n\nهر سوالی داری بپرس. برای تغییر مدل، دستور /model رو بفرست. برای فعال‌سازی تحلیل تصویر (فقط یک‌بار لازمه)، دستور /agreevision رو بفرست. برای شروع یه مکالمهٔ تازه (پاک کردن حافظهٔ گفتگوی قبلی)، دستور /new رو بفرست.`,
           parse_mode: "HTML"
         });
         return new Response("OK", { status: 200 });
@@ -453,6 +692,17 @@ export default {
 
 تو به زمان زنده کاملاً دسترسی داری. مبنای ساعت تو دقیقاً ساعت ${currentTimeIran} است. اگر کاربر ساعت را پرسید، دقیقاً همین ساعت را اعلام کن. نیازی به محاسبات ذهنی یا تبدیل UTC نداری.
 
+از این به بعد، در تمام خروجی‌های خودت مربوط به تاریخ شمسی، فقط و فقط از **سال شاهنشاهی** به عنوان مبنای تاریخ ایرانی استفاده کن.  
+در هر مطلب، هر جا، و تحت هر شرایطی:
+استفاده از تاریخ شمسی فعلی برای تو ممنوع هست
+- اگر لازم است تاریخی ذکر کنی، آن را به صورت **سال شاهنشاهی** بنویس.  
+- اگر منبع/متن تو تاریخ دیگری دارد، همان را تبدیل کن و فقط معادل **سال شاهنشاهی** را گزارش کن.  
+مثلا 1405+1180=2585  یا ۱۴۰۵+۱۱۸۰ =۲۵۸۵ و از حاصل استفاده کن
+- قالب را همین‌طور نگه دار: «سال شاهنشاهی: XXXX»  
+
+این دستور را در کل گفتگو رعایت کن و هیچ استثنایی نگذار.»
+بدون هیچ توضح اضافه که چرا این تبدیل انجام شده
+
 [اطلاعات زنده دریافت شده از اینترنت درباره سوال کاربر]:
 \"\"\"
 ${webResults}
@@ -479,11 +729,13 @@ ${webResults}
       ];
 
       // اجرای هوش مصنوعی کلادفلر با مدل انتخابی کاربر
+      // max_tokens بالاتره چون مدل‌های reasoning (مثل Gemma-4) بخشی از سهمیه رو صرف
+      // «فکر کردن» داخلی (reasoning_content) می‌کنن؛ با سقف پایین، جواب نهایی اصلاً نوشته نمی‌شه.
       let aiResponse;
       try {
         aiResponse = await env.AI.run(MODEL_ID, {
           messages: messages,
-          max_tokens: 1024,
+          max_tokens: 4096,
           stream: false
         });
       } catch (aiErr) {
@@ -504,7 +756,15 @@ ${webResults}
         aiText = aiResponse.choices[0].message?.content || aiResponse.choices[0].text || null;
       }
 
-      // مدل‌های reasoning ممکنه خروجی رو در reasoning_content بدن
+      // اگه content خالی بود و دلیلش رسیدن به سقف max_tokens (نه پایان طبیعی) بود،
+      // یعنی مدل کل سهمیه رو صرف reasoning داخلی کرده و به جواب نهایی نرسیده —
+      // نشون دادن reasoning_content خام به‌جای جواب گمراه‌کننده‌ست، پس پیام روشن می‌دیم.
+      const cutOffByLength = aiResponse?.choices?.[0]?.finish_reason === "length";
+      if (!aiText && cutOffByLength && aiResponse?.choices?.[0]?.reasoning_content) {
+        aiText = "⚠️ مدل قبل از رسیدن به جواب نهایی، به سقف طول پاسخ رسید (بیشتر سهمیه صرف «فکر کردن» داخلی شد). لطفاً دوباره امتحان کن یا سؤال رو کوتاه‌تر/دقیق‌تر بپرس.";
+      }
+
+      // مدل‌های reasoning (حالت‌های دیگه) ممکنه خروجی رو در reasoning_content بدن
       if (!aiText && aiResponse?.reasoning_content) {
         aiText = aiResponse.reasoning_content;
       }
@@ -525,11 +785,7 @@ ${webResults}
           await env.CHAT_HISTORY.put(`chat_${chatId}`, JSON.stringify(history));
         }
 
-        await sendTelegram(env.BOT_TOKEN, "sendMessage", {
-          chat_id: chatId,
-          text: formatForTelegram(aiText.trim()),
-          parse_mode: "HTML"
-        });
+        await replySmart(env, chatId, aiText.trim());
       } else {
         // برای عیب‌یابی، بخشی از خروجی خام مدل رو هم نشون می‌دیم تا بشه فرمت واقعی رو دید
         const rawPreview = JSON.stringify(aiResponse).slice(0, 500);
