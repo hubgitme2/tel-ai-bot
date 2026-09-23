@@ -1,0 +1,12 @@
+# اجباری — توکن ربات تلگرام (از @BotFather)
+BOT_TOKEN=
+
+# اختیاری — کلید Tavily برای جستجوی زنده در وب (tavily.com)
+TAVILY_API_KEY=
+
+# اختیاری — برای نمایش وضعیت مصرف روزانه‌ی Neuron در /start و /model
+CF_API_TOKEN=
+CF_ACCOUNT_ID=
+
+# اختیاری — آی‌دی عددی کاربران مجاز تلگرام، جدا شده با کاما؛ خالی یعنی ربات برای همه باز است
+ALLOWED_USER_IDS=
