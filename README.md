@@ -5,7 +5,7 @@
 ## دیپلوی با یک کلیک
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hhdoust2/AICloudflareTLGbot)
-> ⚠️ قبل از استفاده از دکمهٔ بالا، لینک `<YOUR_REPO_URL>` رو **یک‌بار** با آدرس ریپوی گیت‌هاب خودت (بعد از push کردن این فایل‌ها) جایگزین کن — مثلاً `https://github.com/USERNAME/REPO_NAME`. این ویرایش فقط همون یک‌بار لازمه؛ از اون به بعد هرکسی (خودت یا هرکس دیگه) روی همون دکمه کلیک کنه، مستقیم توی اکانت کلادفلر خودش دیپلوی می‌شه — بدون فورک کردن، بدون هیچ ویرایش دیگه‌ای.
+> 
 
 هنگام کلیک روی دکمه:
 - یک namespace جدید از **Workers KV** (برای تاریخچهٔ چت و مدل انتخابی هر کاربر) خودکار ساخته می‌شود.
