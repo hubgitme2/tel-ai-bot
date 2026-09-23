@@ -11,10 +11,8 @@ binding = "AI"
 [[kv_namespaces]]
 binding = "CHAT_HISTORY"
 
-  // فقط این مقدار هنگام دیپلوی از کاربر پرسیده می‌شه (چون دکمهٔ Deploy کلادفلر
-  // فعلاً هر فیلد داخل vars رو الزامی در نظر می‌گیره و راهی برای «اختیاری» کردنش نداره).
-  // بقیهٔ متغیرهای اختیاری (TAVILY_API_KEY, ALLOWED_USER_IDS, CF_ACCOUNT_ID, CF_API_TOKEN)
-  // عمداً اینجا نیستن؛ هر کدوم رو خواستی، بعد از دیپلوی از داشبورد کلادفلر
-  // (Settings → Variables and Secrets → Add) اضافه کن — نیازی به دیپلوی دوباره نیست.
-  
- BOT_TOKEN =  ""
+# نکته: TAVILY_API_KEY ،CF_API_TOKEN ،CF_ACCOUNT_ID و ALLOWED_USER_IDS
+# عمداً اینجا تعریف نشده‌اند تا در صفحه‌ی نصب Deploy Button ظاهر نشوند.
+# همه‌ی این‌ها اختیاری‌اند و کد فقط در صورت وجودشان استفاده می‌کند؛
+# هر وقت خواستی، بعد از نصب از پنل کلادفلر دستی اضافه‌شان کن
+# (Workers & Pages → نام ورکر → Settings → Variables and Secrets).
