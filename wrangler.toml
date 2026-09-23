@@ -1,4 +1,4 @@
-name = "ai-multitask-bot"
+name = "tel-ai-bot"
 main = "src/worker.js"
 compatibility_date = "2026-09-23"
 
