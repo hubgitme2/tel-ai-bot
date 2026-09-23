@@ -3,7 +3,7 @@
   "name": "tel-ai-bot",
   "main": "tel-ai-bot.js",
   // این تاریخ رو تغییر نده مگر بخوای به نسخه‌های جدیدتر Workers runtime سوییچ کنی
-  "compatibility_date": "2026-09-23",
+  "compatibility_date": "2026-09-16",
 
   // اتصال به Workers AI — نیازی به id نداره، به‌صورت خودکار در دسترس قرار می‌گیره
   "ai": {
