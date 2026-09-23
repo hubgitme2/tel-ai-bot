@@ -1,18 +1,22 @@
 {
-  "name": "tel-ai-bot",
-  "version": "1.0.0",
+  "name": "ai-multitask-bot",
   "private": true,
-  "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
-  },
-  "devDependencies": {
-    "wrangler": "^4.0.0"
-  },
   "cloudflare": {
     "bindings": {
       "BOT_TOKEN": {
-        "description": "توکن ربات تلگرام. از [@BotFather](https://t.me/BotFather) با دستور /newbot بگیر. **الزامی**."
+        "description": "توکن ربات تلگرامت را از [@BotFather](https://t.me/BotFather) بگیر و اینجا وارد کن."
+      },
+      "TAVILY_API_KEY": {
+        "description": "اختیاری — برای فعال‌شدن جستجوی زنده‌ی وب، یک کلید رایگان از [tavily.com](https://tavily.com) بگیر. اگر خالی بماند، ربات بدون جستجوی وب کار می‌کند."
+      },
+      "CF_API_TOKEN": {
+        "description": "اختیاری — فقط برای نمایش وضعیت مصرف روزانه‌ی Neuron در دستورهای /start و /model لازم است. یک API Token با دسترسی خواندن Account Analytics از پنل کلادفلر بساز."
+      },
+      "CF_ACCOUNT_ID": {
+        "description": "اختیاری — همراه با CF_API_TOKEN برای نمایش وضعیت مصرف Neuron لازم است. Account ID را از پنل کلادفلر (کنار هر دامنه/Workers) کپی کن."
+      },
+      "ALLOWED_USER_IDS": {
+        "description": "اختیاری — برای محدود کردن ربات فقط به کاربران خاص، آی‌دی عددی تلگرام‌شان را با کاما جدا کن (مثل 111111111,222222222). اگر خالی بماند، ربات برای همه باز است."
       }
     }
   }
