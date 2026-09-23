@@ -1,17 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "tel-ai-bot",
-  "main": "tel-ai-bot.js",
-  // این تاریخ رو تغییر نده مگر بخوای به نسخه‌های جدیدتر Workers runtime سوییچ کنی
-  "compatibility_date": "2026-09-16",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-23",
+  "compatibility_flags": [],
 
-  // اتصال به Workers AI — نیازی به id نداره، به‌صورت خودکار در دسترس قرار می‌گیره
-  "ai": {
-    "binding": "AI"
+  "observability": {
+    "enabled": true
   },
 
-  // فضای ذخیره‌سازی KV برای تاریخچهٔ چت، مدل انتخابی هر کاربر و ...
-  // id خالی یعنی: هنگام کلیک روی دکمهٔ Deploy، کلادفلر خودش این namespace رو می‌سازه
+  // حافظه‌ی مکالمه + مدل انتخابی هر کاربر (KV).
+  // id خالیه چون قراره خودِ دکمه‌ی «Deploy to Cloudflare» این namespace رو خودکار بسازه و بایند کنه.
   "kv_namespaces": [
     {
       "binding": "CHAT_HISTORY",
@@ -19,12 +18,18 @@
     }
   ],
 
-  // فقط این مقدار هنگام دیپلوی از کاربر پرسیده می‌شه (چون دکمهٔ Deploy کلادفلر
-  // فعلاً هر فیلد داخل vars رو الزامی در نظر می‌گیره و راهی برای «اختیاری» کردنش نداره).
-  // بقیهٔ متغیرهای اختیاری (TAVILY_API_KEY, ALLOWED_USER_IDS, CF_ACCOUNT_ID, CF_API_TOKEN)
-  // عمداً اینجا نیستن؛ هر کدوم رو خواستی، بعد از دیپلوی از داشبورد کلادفلر
-  // (Settings → Variables and Secrets → Add) اضافه کن — نیازی به دیپلوی دوباره نیست.
-  "vars": {
-    "BOT_TOKEN": ""
+  // دسترسی به Workers AI. با همین بایند، دکمه‌ی دیپلوی به‌صورت خودکار دسترسی AI رو
+  // روی اکانت کاربر فعال می‌کنه؛ نیازی به کار دستی در پنل نیست.
+  "ai": {
+    "binding": "AI"
+  },
+
+  // BOT_TOKEN تنها متغیری‌ست که پر کردنش اجباریه؛ اگر کاربر موقع دیپلوی خالی بذارتش،
+  // خودِ wrangler دیپلوی رو با خطای «BOT_TOKEN تنظیم نشده» متوقف می‌کنه.
+  // TAVILY_API_KEY / CF_API_TOKEN / CF_ACCOUNT_ID / ALLOWED_USER_IDS در .dev.vars.example
+  // تعریف شدن تا در همون صفحه‌ی تنظیمات دیده بشن، ولی چون اینجا الزامی نشدن، خالی گذاشتنشون مشکلی نداره
+  // (کد داخل src/index.js هم برای هر کدوم حالت «تنظیم نشده» رو هندل می‌کنه).
+  "secrets": {
+    "required": ["BOT_TOKEN"]
   }
 }
