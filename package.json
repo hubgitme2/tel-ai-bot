@@ -1,10 +1,18 @@
 {
   "name": "tel-ai-bot",
+  "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
   "cloudflare": {
     "bindings": {
       "BOT_TOKEN": {
-        "description": "توکن ربات تلگرامت را از [@BotFather](https://t.me/BotFather) بگیر و اینجا وارد کن."
+        "description": "توکن ربات تلگرام. از [@BotFather](https://t.me/BotFather) با دستور /newbot بگیر. **الزامی**."
       }
     }
   }
