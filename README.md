@@ -31,8 +31,8 @@
    این را جایی کپی کن؛ در قدم بعد لازمت می‌شود.
 
 ## قدم ۲: نصب با یک کلیک روی Cloudflare
-
-روی دکمه‌ی زیر بزن:
+ابتدا از این ریپو یک فورک بساز 
+سپس روی دکمه‌ی زیر بزن:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hhdoust2/tel-ai-bot)
 
