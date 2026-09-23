@@ -1,5 +1,5 @@
 {
-  "name": "ai-multitask-bot",
+  "name": "tel-ai-bot",
   "private": true,
   "cloudflare": {
     "bindings": {
